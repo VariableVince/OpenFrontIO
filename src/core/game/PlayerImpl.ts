@@ -1379,8 +1379,8 @@ export class PlayerImpl implements Player {
 
       // Cumulative bulk-upgrade totals. Each upgrade raises the unit's level
       // and the constructed count, so step n costs the same as if the player
-      // already had n extra units — costByExtraUnits resolves the owned-unit
-      // count behind escalating costs once, not once per step.
+      // already had n extra units — costByExtraUnits resolves the unit
+      // count once.
       let upgradeCosts: Gold[] | undefined;
       if (canUpgrade !== false) {
         upgradeCosts = new Array<Gold>(MAX_UPGRADE_AMOUNT);

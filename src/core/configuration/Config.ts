@@ -575,8 +575,7 @@ export class Config {
 
   // `type`'s cost as a function of extraUnits, with the player's
   // owned/constructed unit count resolved once up front. Bulk callers pricing
-  // many steps (the upgrade ladder in PlayerImpl.buildableUnits) avoid
-  // re-scanning the player's units on every step.
+  // many steps avoid re-scanning the player's units on every step.
   public costByExtraUnits(
     type: UnitType,
     game: Game,

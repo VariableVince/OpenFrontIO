@@ -18,26 +18,11 @@ import {
 } from "../../src/core/game/Game";
 import { setup } from "../util/Setup";
 
-// setup() reads test maps relative to tests/util; __dirname is unavailable
-// under ESM tsx, so resolve that directory explicitly.
 const TEST_UTIL_DIR = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
   "util",
 );
-
-/**
- * Real-use benchmark for the full hover → build-menu pipeline.
- *
- * Hovering a tile in the client runs the worker's GameRunner.playerActions,
- * and opening the radial build menu prices its x1/x5/x10/xMax slots from the
- * resulting BuildableUnits with maxBulkAmount/bulkCost — the exact helpers the
- * client menu uses. This measures the whole path a player exercises on hover,
- * not just the raw buildableUnits call behind UpgradeCostPerf.
- *
- * Run on the same checkout before and after changes and compare ops/sec:
- *   npx tsx tests/perf/UpgradeRealUsePerf.ts
- */
 
 const UPGRADABLE = [
   UnitType.City,
@@ -62,7 +47,6 @@ async function buildScenario(): Promise<{
   game.config().structureMinDist = () => 2;
   player.addGold(1_000_000_000n);
 
-  // Own the whole map so isAlive()/canBuildUnitType() stay true.
   for (let y = 0; y < game.height(); y++) {
     for (let x = 0; x < game.width(); x++) {
       const t = game.ref(x, y);
@@ -72,8 +56,6 @@ async function buildScenario(): Promise<{
     }
   }
 
-  // One of each structure type within structureMinDist of the hover tile so
-  // findExistingUnitToUpgrade finds them all. Port sits on the coast (x=7).
   const cluster: [UnitType, number, number][] = [
     [UnitType.City, 5, 8],
     [UnitType.Port, 7, 8],
@@ -99,7 +81,6 @@ async function buildScenario(): Promise<{
     }
   }
 
-  // The real worker entry the client hits on every hover.
   const runner = new GameRunner(
     game,
     new Executor(game, "perf_game", undefined),
@@ -134,8 +115,6 @@ async function buildScenario(): Promise<{
   return { game, player, runner };
 }
 
-// Price the structure bulk slots exactly like the radial menu does: x1 plus
-// the fixed steps plus the largest amount the player can execute.
 function priceMenuSlots(buildables: BuildableUnit[], gold: Gold): void {
   for (const bu of buildables) {
     const maxAmount = maxBulkAmount(bu, gold);

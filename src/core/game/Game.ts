@@ -158,8 +158,7 @@ export interface PublicGameModifiers {
 export const MAX_UPGRADE_AMOUNT = 50;
 
 // A unit-count-driven cost curve: the price of a unit depends on how many of
-// `types` the player already owns or is constructing (see Player.unitsOwned /
-// Player.unitsConstructed).
+// unit type(s) the player already owns or is constructing
 export interface UnitCostCurve {
   costFn: (units: number) => number;
   types: readonly UnitType[];
@@ -169,9 +168,6 @@ export interface UnitInfo {
   // extraUnits shifts the cost curve as if the player already had that many
   // additional units/levels — used to price the later steps of a bulk upgrade.
   cost: (game: Game, player: Player, extraUnits?: number) => Gold;
-  // The curve behind `cost` for unit-count-priced units. Lets bulk callers
-  // resolve the owned-unit count once (Config.costByExtraUnits) instead of
-  // re-scanning the player's units on every `cost` call.
   costCurve?: UnitCostCurve;
   maxHealth?: number;
   damage?: number;
