@@ -14,6 +14,7 @@ import {
   TerrainType,
   TerraNullius,
   Tick,
+  UnitCostCurve,
   UnitInfo,
   UnitType,
 } from "../game/Game";
@@ -368,7 +369,7 @@ export class Config {
         break;
       case UnitType.Warship:
         info = {
-          cost: this.costWrapper(
+          ...this.costWrapper(
             (numUnits: number) => Math.min(1_000_000, (numUnits + 1) * 250_000),
             UnitType.Warship,
           ),
@@ -388,7 +389,7 @@ export class Config {
         break;
       case UnitType.Port:
         info = {
-          cost: this.costWrapper(
+          ...this.costWrapper(
             (numUnits: number) =>
               Math.min(1_000_000, Math.pow(2, numUnits) * 125_000),
             UnitType.Port,
@@ -400,12 +401,12 @@ export class Config {
         break;
       case UnitType.AtomBomb:
         info = {
-          cost: this.costWrapper(() => 750_000, UnitType.AtomBomb),
+          ...this.costWrapper(() => 750_000, UnitType.AtomBomb),
         };
         break;
       case UnitType.HydrogenBomb:
         info = {
-          cost: this.costWrapper(() => 5_000_000, UnitType.HydrogenBomb),
+          ...this.costWrapper(() => 5_000_000, UnitType.HydrogenBomb),
         };
         break;
       case UnitType.MIRV:
@@ -433,14 +434,14 @@ export class Config {
         break;
       case UnitType.MissileSilo:
         info = {
-          cost: this.costWrapper(() => 1_000_000, UnitType.MissileSilo),
+          ...this.costWrapper(() => 1_000_000, UnitType.MissileSilo),
           constructionDuration: this.instantBuild() ? 0 : 10 * 10,
           upgradable: true,
         };
         break;
       case UnitType.DefensePost:
         info = {
-          cost: this.costWrapper(
+          ...this.costWrapper(
             (numUnits: number) => Math.min(250_000, (numUnits + 1) * 50_000),
             UnitType.DefensePost,
           ),
@@ -449,7 +450,7 @@ export class Config {
         break;
       case UnitType.SAMLauncher:
         info = {
-          cost: this.costWrapper(
+          ...this.costWrapper(
             (numUnits: number) =>
               Math.min(3_000_000, (numUnits + 1) * 1_500_000),
             UnitType.SAMLauncher,
@@ -462,7 +463,7 @@ export class Config {
         break;
       case UnitType.City:
         info = {
-          cost: this.costWrapper(
+          ...this.costWrapper(
             (numUnits: number) =>
               Math.min(1_000_000, Math.pow(2, numUnits) * 125_000),
             UnitType.City,
@@ -473,7 +474,7 @@ export class Config {
         break;
       case UnitType.Factory:
         info = {
-          cost: this.costWrapper(
+          ...this.costWrapper(
             (numUnits: number) =>
               Math.min(1_000_000, Math.pow(2, numUnits) * 125_000),
             UnitType.Factory,
@@ -550,22 +551,57 @@ export class Config {
   private costWrapper(
     costFn: (units: number) => number,
     ...types: UnitType[]
-  ): (g: Game, p: Player, extraUnits?: number) => bigint {
-    return (game: Game, player: Player, extraUnits: number = 0) => {
-      if (
-        player.type() === PlayerType.Human &&
-        this.hasInfiniteGoldFor(player)
-      ) {
-        return 0n;
-      }
-      const numUnits = types.reduce(
-        (acc, type) =>
-          acc +
-          Math.min(player.unitsOwned(type), player.unitsConstructed(type)),
-        0,
-      );
-      return BigInt(costFn(numUnits + extraUnits));
+  ): Pick<UnitInfo, "cost" | "costCurve"> {
+    const costCurve: UnitCostCurve = { costFn, types };
+    return {
+      cost: (game: Game, player: Player, extraUnits: number = 0) =>
+        this.curveCost(
+          costCurve,
+          this.baseUnitsFor(costCurve.types, player),
+          extraUnits,
+          player,
+        ),
+      costCurve,
     };
+  }
+
+  private baseUnitsFor(types: readonly UnitType[], player: Player): number {
+    return types.reduce(
+      (acc, type) =>
+        acc + Math.min(player.unitsOwned(type), player.unitsConstructed(type)),
+      0,
+    );
+  }
+
+  // `type`'s cost as a function of extraUnits, with the player's
+  // owned/constructed unit count resolved once up front. Bulk callers pricing
+  // many steps (the upgrade ladder in PlayerImpl.buildableUnits) avoid
+  // re-scanning the player's units on every step.
+  public costByExtraUnits(
+    type: UnitType,
+    game: Game,
+    player: Player,
+  ): (extraUnits: number) => Gold {
+    const info = this.unitInfo(type);
+    if (info.costCurve === undefined) {
+      return (extraUnits: number) => info.cost(game, player, extraUnits);
+    }
+    const costCurve = info.costCurve;
+    const baseUnits = this.baseUnitsFor(costCurve.types, player);
+    return (extraUnits: number) =>
+      this.curveCost(costCurve, baseUnits, extraUnits, player);
+  }
+
+  private curveCost(
+    costCurve: UnitCostCurve,
+    baseUnits: number,
+    extraUnits: number,
+    player: Player,
+  ): Gold {
+    if (player.type() === PlayerType.Human && this.hasInfiniteGoldFor(player)) {
+      return 0n;
+    }
+    return BigInt(costCurve.costFn(baseUnits + extraUnits));
   }
 
   defaultDonationAmount(sender: Player): number {
